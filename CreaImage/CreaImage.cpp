@@ -5,7 +5,6 @@
 #include <math.h>
 #include <algorithm>
 
-#define PI 3.141592
 
 
 using namespace cv;
@@ -18,12 +17,12 @@ struct Ray {
 
 struct Sphere {
 	Vec3d origin;
-	int rayon;
+	double rayon;
 	Vec3d albedo;
 
 	float intersect(const Ray& r) const
 	{                // returns distance, 0 if nohit
-		Vec3f op = origin - r.origin;        // Solve t^2*d.d + 2*t*(o-p).d + (o-p).(o-p)-R^2 = 0
+		Vec3d op = origin - r.origin;        // Solve t^2*d.d + 2*t*(o-p).d + (o-p).(o-p)-R^2 = 0
 		float t, eps = 1e-4, b = op.dot(r.direction), det =
 			b * b - op.dot(op) + rayon * rayon;
 		if (det < 0)
@@ -48,21 +47,24 @@ int main()
 	const int imgWidth = 1000;
 	const int imgHeight = 1000;
 
+	const float PI = 3.141592;
+
 	
 	Mat image = Mat::zeros(imgWidth, imgHeight, CV_8UC3);
 
 	float sphereDistance = 255;
 
-	Sphere murFond{ Vec3d{500, sphereDistance+500, 500}, 400, {1,0,0} };
-	Sphere murGauche{ Vec3d{-10000, sphereDistance+30, 500}, 93230, {0,0,1} };
-	Sphere murDroite{ Vec3d{11000, sphereDistance+30, 500}, 93230, {0,0,1} };
-	Sphere murHaut{ Vec3d{500, sphereDistance + 30, -10000}, 93230, {0,1,0} };
-	Sphere murBas{ Vec3d{500, sphereDistance + 30, 11000}, 93230, {0,1,0} };
+	//Sphere murFond{ Vec3d{500, sphereDistance+500, 500}, 400, {1,0,0} };
+	//Sphere murGauche{ Vec3d{-10000, sphereDistance+30, 500}, 93230, {0,0,1} };
+	//Sphere murDroite{ Vec3d{11000, sphereDistance+30, 500}, 93230, {0,0,1} };
+	//Sphere murHaut{ Vec3d{500, sphereDistance + 30, -10000}, 93230, {0,1,0} };
+	Sphere murBas{ Vec3d{400, sphereDistance-100, 450}, 20, {0,1,0} };
 	Sphere sphere{ Vec3d{350, sphereDistance, 500}, 100 , {0,1,1} };
 	Sphere sphere2{ Vec3d{650, sphereDistance, 500}, 100, {1,1,0} };
 
 
-	vector<Sphere> spheres = { sphere, sphere2, murGauche, murDroite, murHaut, murBas, murFond };
+	//vector<Sphere> spheres = { sphere, sphere2, murGauche, murDroite, murHaut, murBas, murFond };
+	vector<Sphere> spheres = { murBas, sphere, sphere2   };
 
 	LightSource lightSource{ Vec3d{500, sphereDistance-200, 300}, 70000000 };
 	bool sphereFound = false;
@@ -70,7 +72,7 @@ int main()
 		for (int j = 0; j < imgHeight ; ++j) {
 			
 			Ray ray{ Vec3d{(float)i, 0, (float)j}, Vec3d{0, 1, 0} };
-			for (Sphere s : spheres) {
+			for (Sphere& s : spheres) {
 				if (sphereFound)
 					break;
 
@@ -89,14 +91,36 @@ int main()
 					Vec3d normale = X - s.origin;
 					double normNormale = cv::norm(normale, NORM_L2);
 					normale = normale / normNormale;
-					double f = w0.dot(normale) / PI;
+					double f = abs(w0.dot(normale) / PI);
 
-					Vec3d couleur = (lightSource.color * f * s.albedo) / d2;
+					//cout << w0 << endl;
+					Ray rayFromIntersec{ X, w0 };
+					double smallestDist = -1;
+
+					for (Sphere& s2 : spheres) {
+						double dist = s2.intersect(rayFromIntersec);
+						if (smallestDist == -1 && dist >0)
+							smallestDist = dist;
+						else if (smallestDist > dist && dist>0)
+							smallestDist = dist;
+					}
+
+					float isClear =1;
+					//cout << abs(pow(smallestDist, 2) - d2)  << endl;
+					if (smallestDist != -1) {
+						if (pow(smallestDist, 2) > d2)
+							isClear = 1;
+						else
+							isClear = 0;
+					}
+					
+
+					Vec3d couleur = (lightSource.color * f * s.albedo*isClear) / d2;
 
 					image.at<Vec3b>({ i,j }) = couleur;
 					sphereFound = true;
 				} else {
-					image.at<Vec3b>({ i,j }) = { 255,255,0 };
+					image.at<Vec3b>({ i,j }) = { 150,150,150 };
 				}
 
 			
